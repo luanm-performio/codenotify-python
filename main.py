@@ -274,8 +274,10 @@ def main():
         print("No CODEPROS globs found.")
         return
 
+    print(code_pro_globs)
     pros = set()
     for changed_file in get_changed_files(github_dir, pr_id, base_ref, head_ref):
+        print(changed_file)
         for code_pro_glob in code_pro_globs:
             if fnmatch(changed_file, code_pro_glob.glob):
                 print(f"Rule {code_pro_glob.glob} matches {changed_file}")
