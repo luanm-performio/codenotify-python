@@ -265,6 +265,7 @@ def main():
     pr_author = "@" + github_event_data["pull_request"]["user"]["login"]
     pr_id = github_event_data["pull_request"]["node_id"]
 
+    print(f'GithubDir: {github_dir}')
     codepros_location = os.path.join(github_dir, CODEPROS_FILE)
 
     # do not notify this pr's author
