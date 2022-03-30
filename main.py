@@ -9,7 +9,7 @@ from fnmatch import fnmatch
 import requests
 
 
-BASE_PR_COMMENT = "❕ Changes in watched files detected, these may need to be kept in sync between front-end and calculation-module?\ncc:{}"
+BASE_PR_COMMENT = "❓Changes in watched files detected, Do these need to be kept in sync between front-end and calculation-module?\ncc:{}"
 PR_COMMENT_TITLE = "<!-- codenotify report -->\n"
 CODEPROS_FILE = "CODEPROS"
 
