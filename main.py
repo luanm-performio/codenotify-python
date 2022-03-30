@@ -9,7 +9,7 @@ from fnmatch import fnmatch
 import requests
 
 
-BASE_PR_COMMENT = "👔 Code pros! Mind taking a look at this PR?\ncc:{}"
+BASE_PR_COMMENT = "❕ Changes in watched files detected, these may need to be kept in sync between front-end and calculation-module?\ncc:{}"
 PR_COMMENT_TITLE = "<!-- codenotify report -->\n"
 CODEPROS_FILE = "CODEPROS"
 
@@ -265,7 +265,6 @@ def main():
     pr_author = "@" + github_event_data["pull_request"]["user"]["login"]
     pr_id = github_event_data["pull_request"]["node_id"]
 
-    print(f'GithubDir: {github_dir}')
     codepros_location = os.path.join(github_dir, CODEPROS_FILE)
 
     # do not notify this pr's author
@@ -274,10 +273,8 @@ def main():
         print("No CODEPROS globs found.")
         return
 
-    print(code_pro_globs)
     pros = set()
     for changed_file in get_changed_files(github_dir, pr_id, base_ref, head_ref):
-        print(changed_file)
         for code_pro_glob in code_pro_globs:
             if fnmatch(changed_file, code_pro_glob.glob):
                 print(f"Rule {code_pro_glob.glob} matches {changed_file}")
