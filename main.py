@@ -221,7 +221,7 @@ def comment_on_pr(pr_id, pros, changed_files):
 
     comment = BASE_PR_COMMENT.format(" ".join(pros))
     if changed_files:
-        comment += "\List of files:\n* "
+        comment += "\nList of files:\n* "
         comment += '\n* '.join(changed_files)
     if comment_id:  # update existing comment
         print(f"Updating comment pros to include {pros}")
