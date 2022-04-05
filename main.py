@@ -220,6 +220,7 @@ def comment_on_pr(pr_id, pros, changed_files):
             break
 
     comment = BASE_PR_COMMENT.format(" ".join(pros))
+    comment = f"{PR_COMMENT_TITLE}\n{comment}"
     if changed_files:
         comment += "\nList of files:\n* "
         comment += '\n* '.join(changed_files)
