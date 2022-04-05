@@ -208,7 +208,7 @@ def get_code_pros_globs(codepros_location, ignore_pros):
     return code_pro_globs
 
 
-def comment_on_pr(pr_id, pros):
+def comment_on_pr(pr_id, pros, changed_files):
     """ Add (or change) a comment on a PR to notify code pros by their GitHub handle. """
 
     response = github_graphql_client.make_request(GRAPHQL_GET_PR_COMMENTS, {"nodeId": pr_id})
@@ -220,8 +220,9 @@ def comment_on_pr(pr_id, pros):
             break
 
     comment = BASE_PR_COMMENT.format(" ".join(pros))
-    comment = f"{PR_COMMENT_TITLE}\n{comment}"
-
+    if changed_files:
+        comment += "\List of files:\n* "
+        comment += '\n* '.join(changed_files)
     if comment_id:  # update existing comment
         print(f"Updating comment pros to include {pros}")
         _ = github_graphql_client.make_request(
@@ -274,14 +275,15 @@ def main():
         return
 
     pros = set()
+    changed_files = set()
     for changed_file in get_changed_files(github_dir, pr_id, base_ref, head_ref):
         for code_pro_glob in code_pro_globs:
             if fnmatch(changed_file, code_pro_glob.glob):
                 print(f"Rule {code_pro_glob.glob} matches {changed_file}")
                 pros |= code_pro_glob.pros
-
+                changed_files.update(changed_file.split())
     if pros:
-        comment_on_pr(pr_id, pros)
+        comment_on_pr(pr_id, pros, changed_files)
     else:
         print("No pros found for these files")
 

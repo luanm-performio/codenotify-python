@@ -189,12 +189,12 @@ class TestCommentOnPR(unittest.TestCase):
         "main.github_graphql_client.make_request",
         return_value={"data": {"node": {"comments": {"nodes": [{"id": 1, "body": PR_COMMENT_TITLE}]}}}})
     def test_update_comment(self, github_graphql):
-        comment_on_pr(123, "@pro")
+        comment_on_pr(123, {"@pro"}, {"main.py", "test_main.py"})
         self.assertEqual(github_graphql.call_args[0][0], GRAPHQL_UPDATE_PR_COMMENT)
 
     @patch("main.github_graphql_client.make_request", return_value={"data": {"node": {"comments": {"nodes": []}}}})
     def test_add_new_comment(self, github_graphql):
-        comment_on_pr(123, "@pro")
+        comment_on_pr(123, {"@pro"}, {"main.py", "test_main.py"})
         self.assertEqual(github_graphql.call_args[0][0], GRAPHQL_ADD_PR_COMMENT)
 
 
@@ -268,7 +268,7 @@ class TestMain(unittest.TestCase):
         with patch("main.comment_on_pr") as comment_on_pr_mock:
             main()
 
-        comment_on_pr_mock.assert_called_with(self.GITHUB_EVENT_DATA["pull_request"]["node_id"], {"@pro"})
+        comment_on_pr_mock.assert_called_with(self.GITHUB_EVENT_DATA["pull_request"]["node_id"], {"@pro"}, {"main.py"})
 
 
 if __name__ == "__main__":
