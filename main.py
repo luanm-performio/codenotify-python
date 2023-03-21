@@ -9,8 +9,8 @@ from fnmatch import fnmatch
 import requests
 
 
-BASE_PR_COMMENT = "❓Changes in watched files detected, Do these need to be kept in sync between front-end and calculation-module?\ncc:{}"
-PR_COMMENT_TITLE = "<!-- codenotify report -->\n"
+BASE_PR_COMMENT = "❓ Do any of your changes impact compatibility between `performancecentre` and `calculation-engine`? If you're not sure, refer to [this confluence page](https://performancecentre.atlassian.net/wiki/spaces/Tech/pages/2704605191/), or reach out in `#team-systems`."
+PR_COMMENT_TITLE = "Reminder: Calc Engine Compatibility"
 CODEPROS_FILE = "CODEPROS"
 
 # Env vars
@@ -219,7 +219,10 @@ def comment_on_pr(pr_id, pros, changed_files):
             comment_id = comment["id"]
             break
 
-    comment = BASE_PR_COMMENT.format(" ".join(pros))
+    comment = BASE_PR_COMMENT
+    if pros:
+        comment.format("\nCC: ".join(pros))
+        
     comment = f"{PR_COMMENT_TITLE}\n{comment}"
     if changed_files:
         comment += "\nList of files:\n* "
@@ -283,10 +286,8 @@ def main():
                 print(f"Rule {code_pro_glob.glob} matches {changed_file}")
                 pros |= code_pro_glob.pros
                 changed_files.update(changed_file.split())
-    if pros:
+
         comment_on_pr(pr_id, pros, changed_files)
-    else:
-        print("No pros found for these files")
 
 
 if __name__ == "__main__":
