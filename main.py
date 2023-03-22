@@ -8,6 +8,8 @@ from fnmatch import fnmatch
 # Pip imports
 import requests
 
+DEFAULT_PR_COMMENT = "❓Changes in watched files detected, Do these need to be kept in sync between front-end and calculation-module?\ncc:{}"
+DEFAULT_COMMENT_TITLE = "<!-- codenotify report -->\n"
 CODEPROS_FILE = "CODEPROS"
 
 # Env vars
@@ -224,22 +226,24 @@ def get_code_pros_dict(codepros_location, ignore_pros) -> CodeProsDict:
     }
 
 
-def comment_on_pr(pr_id, comment_title, comment_message, pros, changed_files):
+def comment_on_pr(pr_id, comment_title: str, comment_message: str, pros, changed_files):
     """ Add (or change) a comment on a PR to notify code pros by their GitHub handle. """
 
     response = github_graphql_client.make_request(GRAPHQL_GET_PR_COMMENTS, {"nodeId": pr_id})
 
+    pr_comment_title = comment_title if len(comment_title) > 0 else DEFAULT_COMMENT_TITLE
+    pr_comment_message = comment_message if len(comment_message) > 0 else DEFAULT_PR_COMMENT
+
     comment_id = None
     for comment in response["data"]["node"]["comments"]["nodes"]:
-        if comment["body"].startswith(PR_COMMENT_TITLE):
+        if comment["body"].startswith(pr_comment_title):
             comment_id = comment["id"]
             break
 
-    comment = comment_message
     if pros:
-        comment.format("\nCC: ".join(pros))
+        pr_comment_message.format("\nCC: ".join(pros))
 
-    comment = f"{comment_title}\n{comment}"
+    comment = f"{pr_comment_title}\n{pr_comment_message}"
     if changed_files:
         comment += "\nList of files:\n* "
         comment += '\n* '.join(changed_files)

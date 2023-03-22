@@ -13,9 +13,9 @@ from main import (
     GITHUB_WORKSPACE_ENV_VAR,
     GRAPHQL_ADD_PR_COMMENT,
     GRAPHQL_UPDATE_PR_COMMENT,
-    PR_COMMENT_TITLE,
+    DEFAULT_COMMENT_TITLE,
+    DEFAULT_PR_COMMENT,
     CodeProsGlob,
-    CodeProsDict,
     GitHubGraphQLClient,
     comment_on_pr,
     get_changed_files,
@@ -196,7 +196,7 @@ class TestCommentOnPR(unittest.TestCase):
 
     @patch(
         "main.github_graphql_client.make_request",
-        return_value={"data": {"node": {"comments": {"nodes": [{"id": 1, "body": PR_COMMENT_TITLE}]}}}})
+        return_value={"data": {"node": {"comments": {"nodes": [{"id": 1, "body": "Test title"}]}}}})
     def test_update_comment(self, github_graphql):
         comment_on_pr(123, "Test title", "Test PR message", {"@pro"}, {"main.py", "test_main.py"})
         self.assertEqual(github_graphql.call_args[0][0], GRAPHQL_UPDATE_PR_COMMENT)
@@ -205,6 +205,12 @@ class TestCommentOnPR(unittest.TestCase):
     def test_add_new_comment(self, github_graphql):
         comment_on_pr(123, "Test title", "Test PR message", {"@pro"}, {"main.py", "test_main.py"})
         self.assertEqual(github_graphql.call_args[0][0], GRAPHQL_ADD_PR_COMMENT)
+
+    @patch("main.github_graphql_client.make_request", return_value={"data": {"node": {"comments": {"nodes": []}}}})
+    def test_comment_with_empty_title_and_message(self, github_graphql):
+        comment_on_pr(123, "", "",  {"@pro"}, {"main.py", "test_main.py"})
+        self.assertIn(DEFAULT_COMMENT_TITLE, github_graphql.call_args[0][1]["body"])
+        self.assertIn(DEFAULT_PR_COMMENT, github_graphql.call_args[0][1]["body"])
 
 
 class TestGetGitHubEventData(unittest.TestCase):
