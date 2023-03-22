@@ -117,7 +117,7 @@ class TestCodeProsGlobs(unittest.TestCase):
 
             code_pros_globs = get_code_pros_dict(CODEPROS_FILE, {"@pro2"})["globs"]
 
-        self.assertEqual(len(code_pros_globs), 1)
+        self.assertEqual(len(code_pros_globs), 2)
         self.assertEqual(code_pros_globs[0].pros, {"@pro"})
         self.assertEqual(code_pros_globs[0].glob, "main.py")
 
@@ -138,6 +138,20 @@ class TestCodeProsGlobs(unittest.TestCase):
         self.assertEqual(code_pros_globs[0].glob, "main.py")
         self.assertEqual(code_pros_globs[1].pros, {"@pro"})
         self.assertEqual(code_pros_globs[1].glob, "test_main.py")
+
+    def test_good_codepros_file_without_pros(self):
+        code_pros_dict = get_code_pros_dict("test_standards/good_codepros_file_without_pros", set())
+        code_pros_title = code_pros_dict["title"]
+        code_pros_message = code_pros_dict["message"]
+        code_pros_globs = code_pros_dict["globs"]
+
+        self.assertEqual(code_pros_title, "Test title")
+        self.assertEqual(code_pros_message, "Test message")
+        self.assertEqual(len(code_pros_globs), 2)
+        self.assertEqual(code_pros_globs[0].pros, set())
+        self.assertEqual(code_pros_globs[0].glob, "*")
+        self.assertEqual(code_pros_globs[1].pros, set())
+        self.assertEqual(code_pros_globs[1].glob, "**/*")
 
 
 class TestGitHubGraphQLClient(unittest.TestCase):
