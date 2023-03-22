@@ -13,12 +13,13 @@ from main import (
     GITHUB_WORKSPACE_ENV_VAR,
     GRAPHQL_ADD_PR_COMMENT,
     GRAPHQL_UPDATE_PR_COMMENT,
-    PR_COMMENT_TITLE,
+    DEFAULT_COMMENT_TITLE,
+    DEFAULT_PR_COMMENT,
     CodeProsGlob,
     GitHubGraphQLClient,
     comment_on_pr,
     get_changed_files,
-    get_code_pros_globs,
+    get_code_pros_dict,
     get_github_event_data,
     globulize_filepath,
     main,
@@ -77,13 +78,16 @@ class TestCodeProsGlobs(unittest.TestCase):
             m.return_value.__iter__ = lambda self: self
             m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
 
-            code_pro_globs = get_code_pros_globs(CODEPROS_FILE, set())
+            code_pro_dict = get_code_pros_dict(CODEPROS_FILE, set())
+            code_pro_globs = code_pro_dict["globs"]
+            code_pros_message = code_pro_dict["message"]
 
+        self.assertEqual(code_pros_message, "")
         self.assertEqual(code_pro_globs, [])
 
     @patch("os.path.exists", return_value=False)
     def test_codepros_file_missing(self, path_exists):
-        code_pro_globs = get_code_pros_globs(CODEPROS_FILE, set())
+        code_pro_globs = get_code_pros_dict(CODEPROS_FILE, set())
         self.assertEqual(code_pro_globs, [])
 
     def test_codepros_file_missing_file(self):
@@ -92,7 +96,7 @@ class TestCodeProsGlobs(unittest.TestCase):
             m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
 
             with self.assertRaises(IOError) as ex:
-                _ = get_code_pros_globs(CODEPROS_FILE, set())
+                _ = get_code_pros_dict(CODEPROS_FILE, set())
 
             self.assertTrue("line missing file" in str(ex.exception))
 
@@ -102,7 +106,7 @@ class TestCodeProsGlobs(unittest.TestCase):
             m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
 
             with self.assertRaises(IOError) as ex:
-                _ = get_code_pros_globs(CODEPROS_FILE, set())
+                _ = get_code_pros_dict(CODEPROS_FILE, set())
 
             self.assertTrue("pro incorrect" in str(ex.exception))
 
@@ -111,19 +115,24 @@ class TestCodeProsGlobs(unittest.TestCase):
             m.return_value.__iter__ = lambda self: self
             m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
 
-            code_pros_globs = get_code_pros_globs(CODEPROS_FILE, {"@pro2"})
+            code_pros_globs = get_code_pros_dict(CODEPROS_FILE, {"@pro2"})["globs"]
 
         self.assertEqual(len(code_pros_globs), 1)
         self.assertEqual(code_pros_globs[0].pros, {"@pro"})
         self.assertEqual(code_pros_globs[0].glob, "main.py")
 
     def test_good_codepros_file(self):
-        with patch("builtins.open", new_callable=mock_open, read_data="main.py @pro\ntest_main.py @pro\n") as m:
+        with patch("builtins.open", new_callable=mock_open, read_data="TITLE=Test title\nMESSAGE=Test message\nmain.py @pro\ntest_main.py @pro\n") as m:
             m.return_value.__iter__ = lambda self: self
             m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
 
-            code_pros_globs = get_code_pros_globs(CODEPROS_FILE, set())
+            code_pros_dict = get_code_pros_dict(CODEPROS_FILE, set())
+            code_pros_title = code_pros_dict["title"]
+            code_pros_message = code_pros_dict["message"]
+            code_pros_globs = code_pros_dict["globs"]
 
+        self.assertEqual(code_pros_title, "Test title")
+        self.assertEqual(code_pros_message, "Test message")
         self.assertEqual(len(code_pros_globs), 2)
         self.assertEqual(code_pros_globs[0].pros, {"@pro"})
         self.assertEqual(code_pros_globs[0].glob, "main.py")
@@ -187,15 +196,21 @@ class TestCommentOnPR(unittest.TestCase):
 
     @patch(
         "main.github_graphql_client.make_request",
-        return_value={"data": {"node": {"comments": {"nodes": [{"id": 1, "body": PR_COMMENT_TITLE}]}}}})
+        return_value={"data": {"node": {"comments": {"nodes": [{"id": 1, "body": "Test title"}]}}}})
     def test_update_comment(self, github_graphql):
-        comment_on_pr(123, {"@pro"}, {"main.py", "test_main.py"})
+        comment_on_pr(123, "Test title", "Test PR message", {"@pro"}, {"main.py", "test_main.py"})
         self.assertEqual(github_graphql.call_args[0][0], GRAPHQL_UPDATE_PR_COMMENT)
 
     @patch("main.github_graphql_client.make_request", return_value={"data": {"node": {"comments": {"nodes": []}}}})
     def test_add_new_comment(self, github_graphql):
-        comment_on_pr(123, {"@pro"}, {"main.py", "test_main.py"})
+        comment_on_pr(123, "Test title", "Test PR message", {"@pro"}, {"main.py", "test_main.py"})
         self.assertEqual(github_graphql.call_args[0][0], GRAPHQL_ADD_PR_COMMENT)
+
+    @patch("main.github_graphql_client.make_request", return_value={"data": {"node": {"comments": {"nodes": []}}}})
+    def test_comment_with_empty_title_and_message(self, github_graphql):
+        comment_on_pr(123, "", "",  {"@pro"}, {"main.py", "test_main.py"})
+        self.assertIn(DEFAULT_COMMENT_TITLE, github_graphql.call_args[0][1]["body"])
+        self.assertIn(DEFAULT_PR_COMMENT, github_graphql.call_args[0][1]["body"])
 
 
 class TestGetGitHubEventData(unittest.TestCase):
@@ -243,32 +258,40 @@ class TestMain(unittest.TestCase):
         os.environ[GITHUB_WORKSPACE_ENV_VAR] = "full_flow"
         os.environ[GITHUB_EVENT_PATH_ENV_VAR] = "full_flow"
 
-    @patch("main.get_code_pros_globs")
-    def test_ignore_draft_pr(self, get_code_pros_globs):
+    @patch("main.get_code_pros_dict")
+    def test_ignore_draft_pr(self, get_code_pros_dict):
         event_data = deepcopy(self.GITHUB_EVENT_DATA)
         event_data["pull_request"]["draft"] = True
 
         with patch("main.get_github_event_data", return_value=event_data):
             main()
 
-        get_code_pros_globs.assert_not_called()
+        get_code_pros_dict.assert_not_called()
 
     @patch("main.get_changed_files")
     @patch("main.get_github_event_data", return_value=GITHUB_EVENT_DATA)
     def test_no_code_pro_globs(self, get_github_event_data_mock, get_changed_files_mock):
-        with patch("main.get_code_pros_globs", return_value=[]):
+        with patch("main.get_code_pros_dict", return_value={
+            "title": "",
+            "message": "",
+            "globs": [],
+        }):
             main()
 
         get_changed_files_mock.assert_not_called()
 
     @patch("main.get_changed_files", return_value=["main.py"])
-    @patch("main.get_code_pros_globs", return_value=[CodeProsGlob("*", {"@pro"})])
+    @patch("main.get_code_pros_dict", return_value={
+        "title": "Test title",
+        "message": "Test message",
+        "globs": [ CodeProsGlob("*", {"@pro"}) ],
+    })
     @patch("main.get_github_event_data", return_value=GITHUB_EVENT_DATA)
-    def test_full_flow(self, get_github_event_data_mock, get_code_pros_globs_mock, get_changed_files_mock):
+    def test_full_flow(self, get_github_event_data_mock, get_code_pros_dict_mock, get_changed_files_mock):
         with patch("main.comment_on_pr") as comment_on_pr_mock:
             main()
 
-        comment_on_pr_mock.assert_called_with(self.GITHUB_EVENT_DATA["pull_request"]["node_id"], {"@pro"}, {"main.py"})
+        comment_on_pr_mock.assert_called_with(self.GITHUB_EVENT_DATA["pull_request"]["node_id"], "Test title", "Test message", {"@pro"}, {"main.py"})
 
 
 if __name__ == "__main__":

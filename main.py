@@ -8,9 +8,8 @@ from fnmatch import fnmatch
 # Pip imports
 import requests
 
-
-BASE_PR_COMMENT = "❓Changes in watched files detected, Do these need to be kept in sync between front-end and calculation-module?\ncc:{}"
-PR_COMMENT_TITLE = "<!-- codenotify report -->\n"
+DEFAULT_PR_COMMENT = "❓Changes in watched files detected, Do these need to be kept in sync between front-end and calculation-module?\ncc:{}"
+DEFAULT_COMMENT_TITLE = "<!-- codenotify report -->\n"
 CODEPROS_FILE = "CODEPROS"
 
 # Env vars
@@ -168,18 +167,33 @@ def globulize_filepath(filepath):
 
     return filepath
 
+CodeProsDict = {
+    "title": str,
+    "message": str,
+    "globs": [CodeProsGlob],
+}
 
-def get_code_pros_globs(codepros_location, ignore_pros):
+def get_code_pros_dict(codepros_location, ignore_pros) -> CodeProsDict:
     """ Build a collection of CodeProsGlob objects from the CODEPROS file ignoring any pros. """
 
     # CODEPROS file must be defined at the base level of the git repository
     if not os.path.exists(codepros_location):
         return []
 
+    comment_title = ""
+    comment_message = ""
     code_pro_globs = []
     with open(codepros_location) as codepros_file:
         for line in codepros_file:
-            if line[0] == "#":  # commented out line
+            if line[0] == "#": # commented out line
+                continue
+
+            if line[:8] == "MESSAGE=":
+                comment_message = line[8:-1]
+                continue
+
+            if line[:6] == "TITLE=":
+                comment_title = line[6:-1]
                 continue
 
             pro_pattern_line = line[:-1].split(" ")
@@ -205,22 +219,31 @@ def get_code_pros_globs(codepros_location, ignore_pros):
 
             code_pro_globs.append(CodeProsGlob(pros=pros, glob=glob))
 
-    return code_pro_globs
+    return {
+        "title": comment_title,
+        "message": comment_message,
+        "globs": code_pro_globs,
+    }
 
 
-def comment_on_pr(pr_id, pros, changed_files):
+def comment_on_pr(pr_id, comment_title: str, comment_message: str, pros, changed_files):
     """ Add (or change) a comment on a PR to notify code pros by their GitHub handle. """
 
     response = github_graphql_client.make_request(GRAPHQL_GET_PR_COMMENTS, {"nodeId": pr_id})
 
+    pr_comment_title = comment_title if len(comment_title) > 0 else DEFAULT_COMMENT_TITLE
+    pr_comment_message = comment_message if len(comment_message) > 0 else DEFAULT_PR_COMMENT
+
     comment_id = None
     for comment in response["data"]["node"]["comments"]["nodes"]:
-        if comment["body"].startswith(PR_COMMENT_TITLE):
+        if comment["body"].startswith(pr_comment_title):
             comment_id = comment["id"]
             break
 
-    comment = BASE_PR_COMMENT.format(" ".join(pros))
-    comment = f"{PR_COMMENT_TITLE}\n{comment}"
+    if pros:
+        pr_comment_message.format("\nCC: ".join(pros))
+
+    comment = f"{pr_comment_title}\n{pr_comment_message}"
     if changed_files:
         comment += "\nList of files:\n* "
         comment += '\n* '.join(changed_files)
@@ -270,7 +293,10 @@ def main():
     codepros_location = os.path.join(github_dir, CODEPROS_FILE)
 
     # do not notify this pr's author
-    code_pro_globs = get_code_pros_globs(codepros_location, ignore_pros={pr_author})
+    code_pro_dict = get_code_pros_dict(codepros_location, ignore_pros={pr_author})
+    pr_comment_title = code_pro_dict["title"]
+    pr_comment_message = code_pro_dict["message"]
+    code_pro_globs = code_pro_dict["globs"]
     if not code_pro_globs:
         print("No CODEPROS globs found.")
         return
@@ -283,10 +309,8 @@ def main():
                 print(f"Rule {code_pro_glob.glob} matches {changed_file}")
                 pros |= code_pro_glob.pros
                 changed_files.update(changed_file.split())
-    if pros:
-        comment_on_pr(pr_id, pros, changed_files)
-    else:
-        print("No pros found for these files")
+
+        comment_on_pr(pr_id, pr_comment_title, pr_comment_message, pros, changed_files)
 
 
 if __name__ == "__main__":
