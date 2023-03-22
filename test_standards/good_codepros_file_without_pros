@@ -1,0 +1,5 @@
+TITLE=Test title
+MESSAGE=Test message
+# Match all files
+*
+**/*

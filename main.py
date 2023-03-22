@@ -208,8 +208,6 @@ def get_code_pros_dict(codepros_location, ignore_pros) -> CodeProsDict:
             pros = set(pro_pattern_line[1:])
 
             pros -= ignore_pros
-            if not pros:
-                continue
 
             glob = globulize_filepath(filepath)
 
