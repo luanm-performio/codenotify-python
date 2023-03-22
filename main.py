@@ -239,7 +239,7 @@ def comment_on_pr(pr_id, comment_title: str, comment_message: str, pros, changed
             break
 
     if pros:
-        pr_comment_message.format("\nCC: ".join(pros))
+        pr_comment_message = pr_comment_message.format("\nCC: ".join(pros))
 
     comment = f"{pr_comment_title}\n{pr_comment_message}"
     if changed_files:
